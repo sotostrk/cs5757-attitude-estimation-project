@@ -1,0 +1,19 @@
+```
+# EuRoC data - too large for git
+data/
+*.csv
+*.bag
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+
+# Results that can be regenerated
+results/
+
+# OS
+.DS_Store
