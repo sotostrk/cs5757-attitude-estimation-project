@@ -1,5 +1,6 @@
 import numpy as np
 import jax.numpy as jnp
+from jaxlie import SO3
 
 def load_imu(imu_path):
     """
@@ -29,18 +30,9 @@ def load_groundtruth(gt_path):
 
 
 def quat_to_rot(q):
-    """
-    Convert a quaternion to a rotation matrix.
-    q: (4,) array as [qw, qx, qy, qz]
-    returns: (3, 3) rotation matrix
-    """
+    # jaxlie expects [qx, qy, qz, qw] not [qw, qx, qy, qz]
     qw, qx, qy, qz = q
-    R = jnp.array([
-        [1 - 2*(qy**2 + qz**2),     2*(qx*qy - qw*qz),     2*(qx*qz + qw*qy)],
-        [    2*(qx*qy + qw*qz), 1 - 2*(qx**2 + qz**2),     2*(qy*qz - qw*qx)],
-        [    2*(qx*qz - qw*qy),     2*(qy*qz + qw*qx), 1 - 2*(qx**2 + qy**2)]
-    ])
-    return R
+    return SO3(jnp.array([qw, qx, qy, qz])).as_matrix()
 
 
 def align_timestamps(imu_times, gt_times, gt_quats):
