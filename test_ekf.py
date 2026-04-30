@@ -1,20 +1,21 @@
-import jax.numpy as jnp
+import matplotlib.pyplot as plt
 from src.data_loader import load_euroc
-from src.ekf import run_ekf
-from jaxlie import SO3
+import jax.numpy as jnp
 
+timestamps, gyro, R_gt, dt = load_euroc("data/mav0_diff")
 
-timestamps, gyro, R_gt, dt = load_euroc("data/mav0")
+t = timestamps - timestamps[0]
+gyro_norm = jnp.linalg.norm(gyro, axis=1)
 
-R_est = run_ekf(gyro, R_gt, dt)
+plt.figure(figsize=(12, 4))
+plt.plot(t, gyro_norm)
+plt.xlabel("Time (s)")
+plt.ylabel("||omega|| (rad/s)")
+plt.title("Gyro magnitude over time — V1_03_difficult")
+plt.grid(True, alpha=0.3)
+plt.savefig("results/gyro_profile_diff.png", dpi=150)
+plt.show()
 
-print("R_est shape:", R_est.shape)
-print("First estimated rotation:\n", R_est[0])
-print("First ground truth rotation:\n", R_gt[0])
-
-# compute geodesic error at a few timesteps
-for t in [0, 100, 1000, 5000, 10000, 29119]:
-    err = jnp.linalg.norm(
-        SO3.from_matrix(R_est[t].T @ R_gt[t]).log()
-    )
-    print(f"t={t:6d} | geodesic error: {err:.4f} rad")
+print(f"Max gyro magnitude: {float(jnp.max(gyro_norm)):.3f} rad/s")
+print(f"Mean gyro magnitude: {float(jnp.mean(gyro_norm)):.3f} rad/s")
+print(f"Duration: {float(t[-1]):.1f} seconds")

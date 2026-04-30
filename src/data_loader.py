@@ -2,6 +2,7 @@ import numpy as np
 import jax.numpy as jnp
 from jaxlie import SO3
 
+
 def load_imu(imu_path):
     """
     Load IMU data from EuRoC CSV.
@@ -24,13 +25,11 @@ def load_groundtruth(gt_path):
     """
     data = np.loadtxt(gt_path, delimiter=',', skiprows=1)
     timestamps = data[:, 0] * 1e-9  # nanoseconds -> seconds
-    # EuRoC stores quaternion as [qw, qx, qy, qz] in columns 4:8
-    quaternions = data[:, 4:8]
+    quaternions = data[:, 4:8]      # qw, qx, qy, qz
     return jnp.array(timestamps), jnp.array(quaternions)
 
 
 def quat_to_rot(q):
-    # jaxlie expects [qx, qy, qz, qw] not [qw, qx, qy, qz]
     qw, qx, qy, qz = q
     return SO3(jnp.array([qw, qx, qy, qz])).as_matrix()
 
@@ -41,14 +40,20 @@ def align_timestamps(imu_times, gt_times, gt_quats):
     Returns:
         R_gt: (N, 3, 3) rotation matrices aligned to IMU timestamps
     """
-    # For each IMU time find index of closest GT time
     indices = np.searchsorted(np.array(gt_times), np.array(imu_times))
     indices = np.clip(indices, 0, len(gt_times) - 1)
-    
-    # Convert all matched quaternions to rotation matrices
-    matched_quats = gt_quats[indices]  # (N, 4)
-    R_gt = jnp.array([quat_to_rot(q) for q in matched_quats])  # (N, 3, 3)
+    matched_quats = gt_quats[indices]
+    R_gt = jnp.array([quat_to_rot(q) for q in matched_quats])
     return R_gt
+
+
+def truncate(timestamps, gyro, R_gt, seconds=30):
+    """
+    Truncate all arrays to first N seconds of data.
+    """
+    cutoff = timestamps[0] + seconds
+    mask = timestamps <= cutoff
+    return timestamps[mask], gyro[mask], R_gt[mask]
 
 
 def load_euroc(data_dir):
