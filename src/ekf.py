@@ -3,37 +3,74 @@ import jax.numpy as jnp
 from jaxlie import SO3
 
 
-def run_ekf(gyro, R_gt, dt):
-    Q = jnp.diag(jnp.array([0.01, 0.01, 0.01]))
-    V = jnp.diag(jnp.array([0.01, 0.01, 0.01]))
+def run_ekf(gyro, R_gt, dt, sigma=0.3):
+    """
+    Error-state EKF for attitude estimation on SO(3).
+
+    Predict:
+        R_pred  = R * Exp(omega * dt)
+        P_pred  = F P F^T + Q,   F = Exp(-omega * dt)
+
+    Update: noisy attitude reference (synthetic Vicon measurement)
+        R_meas  = R_gt * Exp(eta),   eta ~ N(0, sigma^2 I)
+        z       = Log(R_pred^T R_meas)
+        H       = I_3
+        K       = P_pred (P_pred + V)^{-1}
+        R_new   = R_pred * Exp(K z)
+        P_new   = (I - K) P_pred (I - K)^T + K V K^T
+
+    Args
+        gyro  : (T, 3)    angular velocity [rad/s]
+        R_gt  : (T, 3, 3) ground truth rotations
+        dt    : float     timestep [s]
+        sigma : float     measurement noise [rad], default 0.05 (~3 deg)
+
+    Returns
+        R_est : (T, 3, 3)
+        P_est : (T, 3, 3)
+    """
+    Q = jnp.diag(jnp.array([1e-5, 1e-5, 1e-5]))
+    #V = jnp.eye(3) * (sigma ** 2)
 
     def ekf_step(carry, inputs):
-        R, P = carry
-        omega, R_ground = inputs
+        R, P, key = carry
+        omega, R_gt_t = inputs
 
-        # --- Predict ---
-        F = SO3.exp(-omega * dt).as_matrix()
+        # ── Predict ───────────────────────────────────────────────────────────
+        F      = SO3.exp(-omega * dt).as_matrix()
         R_pred = (SO3.from_matrix(R) @ SO3.exp(omega * dt)).as_matrix()
         P_pred = F @ P @ F.T + Q
 
-        # --- Innovation ---
-        z = SO3.from_matrix(R_pred.T @ R_ground).log()
+        # ── Update ────────────────────────────────────────────────────────────
+        # scale measurement noise with angular velocity
+        omega_norm = jnp.linalg.norm(omega)
+        sigma_t    = sigma * (1.0 + 5.0 * omega_norm)
+        V_t        = jnp.eye(3) * (sigma_t ** 2)
 
-        # --- Kalman Gain ---
-        K = P_pred @ jnp.linalg.inv(P_pred + V)
+        # synthetic noisy attitude measurement
+        key, subkey = jax.random.split(key)
+        eta    = sigma_t * jax.random.normal(subkey, shape=(3,))
+        R_meas = (SO3.from_matrix(R_gt_t) @ SO3.exp(eta)).as_matrix()
 
-        # --- Update ---
+        # innovation
+        z   = SO3.from_matrix(R_pred.T @ R_meas).log()
+        H   = jnp.eye(3)
+        S   = H @ P_pred @ H.T + V_t
+        K   = P_pred @ H.T @ jnp.linalg.inv(S)
+
         R_new = (SO3.from_matrix(R_pred) @ SO3.exp(K @ z)).as_matrix()
-        P_new = (jnp.eye(3) - K) @ P_pred
+        IKH   = jnp.eye(3) - K @ H
+        P_new = IKH @ P_pred @ IKH.T + K @ V_t @ K.T
 
-        # return both R and P as outputs
-        return (R_new, P_new), (R_new, P_new)
+        return (R_new, P_new, key), (R_new, P_new)
 
-    R0 = R_gt[0]
-    P0 = jnp.eye(3) * 0.1
+    R0  = R_gt[0]
+    P0  = jnp.eye(3) * 1e-6
+    key = jax.random.PRNGKey(0)
 
-    inputs = (gyro[:-1], R_gt[1:])
-    _, (R_est, P_est) = jax.lax.scan(ekf_step, (R0, P0), inputs)
+    _, (R_est, P_est) = jax.lax.scan(
+        ekf_step, (R0, P0, key), (gyro[:-1], R_gt[1:])
+    )
 
     R_est = jnp.concatenate([R0[None], R_est], axis=0)
     P_est = jnp.concatenate([P0[None], P_est], axis=0)
