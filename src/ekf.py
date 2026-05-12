@@ -4,31 +4,6 @@ from jaxlie import SO3
 
 
 def run_ekf(gyro, R_gt, dt, sigma=0.3):
-    """
-    Error-state EKF for attitude estimation on SO(3).
-
-    Predict:
-        R_pred  = R * Exp(omega * dt)
-        P_pred  = F P F^T + Q,   F = Exp(-omega * dt)
-
-    Update: noisy attitude reference (synthetic Vicon measurement)
-        R_meas  = R_gt * Exp(eta),   eta ~ N(0, sigma^2 I)
-        z       = Log(R_pred^T R_meas)
-        H       = I_3
-        K       = P_pred (P_pred + V)^{-1}
-        R_new   = R_pred * Exp(K z)
-        P_new   = (I - K) P_pred (I - K)^T + K V K^T
-
-    Args
-        gyro  : (T, 3)    angular velocity [rad/s]
-        R_gt  : (T, 3, 3) ground truth rotations
-        dt    : float     timestep [s]
-        sigma : float     measurement noise [rad], default 0.05 (~3 deg)
-
-    Returns
-        R_est : (T, 3, 3)
-        P_est : (T, 3, 3)
-    """
     Q = jnp.diag(jnp.array([1e-5, 1e-5, 1e-5]))
     #V = jnp.eye(3) * (sigma ** 2)
 

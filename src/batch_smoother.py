@@ -5,14 +5,6 @@ from src.shampoo import mat_inv_fourth_root
 
 
 def cost_fn(delta_phi, R_current, gyro, dt):
-    """
-    Batch smoother cost function using vmap for efficiency.
-    delta_phi: (T, 3)
-    R_current: (T, 3, 3)
-    gyro:      (T-1, 3)
-    dt:        scalar
-    returns:   scalar cost
-    """
     def retract_single(R, dp):
         return (SO3.from_matrix(R) @ SO3.exp(dp)).as_matrix()
 
@@ -31,11 +23,6 @@ def cost_fn(delta_phi, R_current, gyro, dt):
 
 
 def run_batch_smoother(gyro, R_gt, dt, n_iter=50, lr=1e-3):
-    """
-    Run batch smoother with Shampoo optimizer.
-    Uses diagonal approximation for L to handle long sequences.
-    R is kept as full 3x3 matrix — true Shampoo on rotation axes.
-    """
     T = len(gyro)
 
     R_current = jnp.array(R_gt)
@@ -43,7 +30,7 @@ def run_batch_smoother(gyro, R_gt, dt, n_iter=50, lr=1e-3):
 
     # diagonal approximation for L — shape (T,) instead of (T,T)
     L_diag = jnp.ones(T) * 1e-6   # small init for numerical safety
-    # full R matrix — true Shampoo on rotation axes
+    # full R matrix true Shampoo on rotation axes
     R_mat  = jnp.eye(3) * 1e-6
 
     grad_fn = jax.jit(jax.grad(cost_fn))

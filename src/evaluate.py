@@ -5,10 +5,9 @@ import matplotlib.pyplot as plt
 import os
 
 
-# ── Error computation ─────────────────────────────────────────────────────────
+# ── Error computation 
 
 def compute_geodesic_errors(R_est, R_gt):
-    """Geodesic error ||Log(R_est^T R_gt)||_2 at every timestep. Returns (T,)."""
     errors = jnp.array([
         jnp.linalg.norm(SO3.from_matrix(R_est[t].T @ R_gt[t]).log())
         for t in range(len(R_est))
@@ -25,7 +24,7 @@ def compute_metrics(errors, method_name):
     return rmse, peak
 
 
-# ── Individual plot helpers (kept for backward compat) ────────────────────────
+# ── Individual plot helpers
 
 def plot_cost(costs, save_path="results/cost_vs_iteration.png"):
     os.makedirs("results", exist_ok=True)
@@ -41,7 +40,7 @@ def plot_cost(costs, save_path="results/cost_vs_iteration.png"):
     print(f"Saved plot to {save_path}")
 
 
-# ── Main combined plots (called from run_experiment.py) ───────────────────────
+# ── Main combined plots  
 
 def plot_error_grid(timestamps_easy, ekf_errors_easy, batch_errors_easy,
                     timestamps_diff, ekf_errors_diff, batch_errors_diff,
@@ -118,11 +117,6 @@ def plot_runtime_bars(ekf_time, batch_time,
 def plot_sigma_bounds(timestamps, errors, P_est,
                       title="EKF Attitude Error with ±2σ Bounds",
                       save_path="results/sigma_bounds.png"):
-    """
-    EKF error as solid line with shaded ±2σ band — matches the reference style.
-    The 2σ bound is plotted symmetrically around zero (±bound) so the band
-    shows whether the error stays inside the predicted uncertainty envelope.
-    """
     os.makedirs("results", exist_ok=True)
     t = np.array(timestamps) - timestamps[0]
     err_deg = np.degrees(np.array(errors))
@@ -149,7 +143,7 @@ def plot_sigma_bounds(timestamps, errors, P_est,
     print(f"Saved plot to {save_path}")
 
 
-# ── Legacy wrapper (called by old run_experiment structure) ───────────────────
+# ── Legacy wrapper 
 
 def evaluate(timestamps, R_gt, R_ekf, R_smoother=None,
              smoother_costs=None, save_path="results/attitude_error.png"):
